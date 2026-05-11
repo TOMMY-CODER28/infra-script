@@ -1,103 +1,76 @@
----
 name: "scenario-1-ot-inventory-basic"
-description: "OT substation sandbox for Scenario 1 - Asset and Software Inventory (Basic)"
 
-topology:
-  networks:
-    - name: management-net
-      cidr: 192.168.200.0/24
-
-    - name: field-zone
-      cidr: 10.10.10.0/24
-
-    - name: control-zone
-      cidr: 10.10.20.0/24
-
-  routers:
-    - name: substation-router
-      default_route: true
-      interfaces:
-        - management-net
-        - field-zone
-        - control-zone
-
-  nodes:
-
-    # ─── Attacker / Analyst Machine ───────────────────────────────────────────
-    - hostname: kali-attacker
+hosts:
+  - name: kali-attacker
+    flavor: standard.medium
+    base_box:
       image: kali
-      flavor: standard.medium
-      management_network: management-net
-      networks:
-        - management-net
-        - field-zone
-        - control-zone
+      mgmt_user: kali
 
-    # ─── Field Zone: OT Devices ───────────────────────────────────────────────
-
-    - hostname: plc-001
+  - name: plc-001
+    flavor: standard.small
+    base_box:
       image: ubuntu-noble-x86_64
-      flavor: standard.small
-      management_network: management-net
-      networks:
-        - management-net
-        - field-zone
-      user_data: |
-        #cloud-config
-        hostname: plc-001
-        package_update: false
-        runcmd:
-          - systemctl disable --now snapd 2>/dev/null || true
-          - apt-get install -y nmap netcat-openbsd 2>/dev/null || true
+      mgmt_user: ubuntu
 
-    - hostname: rtu-001
+  - name: rtu-001
+    flavor: standard.small
+    base_box:
       image: debian-12-x86_64
-      flavor: standard.small
-      management_network: management-net
-      networks:
-        - management-net
-        - field-zone
-      user_data: |
-        #cloud-config
-        hostname: rtu-001
+      mgmt_user: user
 
-    - hostname: field-switch
+  - name: hmi-001
+    flavor: standard.medium
+    base_box:
       image: ubuntu-noble-x86_64
-      flavor: standard.small
-      management_network: management-net
-      networks:
-        - management-net
-        - field-zone
-      user_data: |
-        #cloud-config
-        hostname: field-switch
+      mgmt_user: ubuntu
 
-    # ─── Control Zone: HMI & SCADA ────────────────────────────────────────────
-
-    - hostname: hmi-001
+  - name: engineering-ws
+    flavor: standard.medium
+    base_box:
       image: ubuntu-noble-x86_64
-      flavor: standard.medium
-      management_network: management-net
-      networks:
-        - management-net
-        - control-zone
-      user_data: |
-        #cloud-config
-        hostname: hmi-001
-        runcmd:
-          - apt-get install -y openssh-server apache2 2>/dev/null || true
-          - systemctl enable --now ssh apache2 2>/dev/null || true
+      mgmt_user: ubuntu
 
-    - hostname: engineering-ws
+routers:
+  - name: substation-router
+    flavor: standard.small
+    base_box:
       image: ubuntu-noble-x86_64
-      flavor: standard.medium
-      management_network: management-net
-      networks:
-        - management-net
-        - control-zone
-      user_data: |
-        #cloud-config
-        hostname: engineering-ws
-        runcmd:
-          - apt-get install -y openssh-server 2>/dev/null || true
-          - systemctl enable --now ssh 2>/dev/null || true
+      mgmt_user: ubuntu
+
+networks:
+  - name: field-zone
+    cidr: 10.10.10.0/24
+
+  - name: control-zone
+    cidr: 10.10.20.0/24
+
+net_mappings:
+  - host: kali-attacker
+    network: field-zone
+    ip: 10.10.10.10
+
+  - host: plc-001
+    network: field-zone
+    ip: 10.10.10.21
+
+  - host: rtu-001
+    network: field-zone
+    ip: 10.10.10.22
+
+  - host: hmi-001
+    network: control-zone
+    ip: 10.10.20.11
+
+  - host: engineering-ws
+    network: control-zone
+    ip: 10.10.20.12
+
+router_mappings:
+  - router: substation-router
+    network: field-zone
+    ip: 10.10.10.1
+
+  - router: substation-router
+    network: control-zone
+    ip: 10.10.20.1
