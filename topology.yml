@@ -74,3 +74,5 @@ router_mappings:
   - router: substation-router
     network: control-zone
     ip: 10.10.20.1
+
+groups: []
