@@ -1,0 +1,103 @@
+---
+name: "scenario-1-ot-inventory-basic"
+description: "OT substation sandbox for Scenario 1 - Asset and Software Inventory (Basic)"
+
+topology:
+  networks:
+    - name: management-net
+      cidr: 192.168.200.0/24
+
+    - name: field-zone
+      cidr: 10.10.10.0/24
+
+    - name: control-zone
+      cidr: 10.10.20.0/24
+
+  routers:
+    - name: substation-router
+      default_route: true
+      interfaces:
+        - management-net
+        - field-zone
+        - control-zone
+
+  nodes:
+
+    # ─── Attacker / Analyst Machine ───────────────────────────────────────────
+    - hostname: kali-attacker
+      image: kali
+      flavor: standard.medium
+      management_network: management-net
+      networks:
+        - management-net
+        - field-zone
+        - control-zone
+
+    # ─── Field Zone: OT Devices ───────────────────────────────────────────────
+
+    - hostname: plc-001
+      image: ubuntu-noble-x86_64
+      flavor: standard.small
+      management_network: management-net
+      networks:
+        - management-net
+        - field-zone
+      user_data: |
+        #cloud-config
+        hostname: plc-001
+        package_update: false
+        runcmd:
+          - systemctl disable --now snapd 2>/dev/null || true
+          - apt-get install -y nmap netcat-openbsd 2>/dev/null || true
+
+    - hostname: rtu-001
+      image: debian-12-x86_64
+      flavor: standard.small
+      management_network: management-net
+      networks:
+        - management-net
+        - field-zone
+      user_data: |
+        #cloud-config
+        hostname: rtu-001
+
+    - hostname: field-switch
+      image: ubuntu-noble-x86_64
+      flavor: standard.small
+      management_network: management-net
+      networks:
+        - management-net
+        - field-zone
+      user_data: |
+        #cloud-config
+        hostname: field-switch
+
+    # ─── Control Zone: HMI & SCADA ────────────────────────────────────────────
+
+    - hostname: hmi-001
+      image: ubuntu-noble-x86_64
+      flavor: standard.medium
+      management_network: management-net
+      networks:
+        - management-net
+        - control-zone
+      user_data: |
+        #cloud-config
+        hostname: hmi-001
+        runcmd:
+          - apt-get install -y openssh-server apache2 2>/dev/null || true
+          - systemctl enable --now ssh apache2 2>/dev/null || true
+
+    - hostname: engineering-ws
+      image: ubuntu-noble-x86_64
+      flavor: standard.medium
+      management_network: management-net
+      networks:
+        - management-net
+        - control-zone
+      user_data: |
+        #cloud-config
+        hostname: engineering-ws
+        runcmd:
+          - apt-get install -y openssh-server 2>/dev/null || true
+          - systemctl enable --now ssh 2>/dev/null || true
