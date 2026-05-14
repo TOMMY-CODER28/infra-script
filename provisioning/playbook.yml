@@ -1,8 +1,65 @@
 ---
 - name: User provisioning
-  hosts: all
-  gather_facts: false
+  hosts: plc-001
+  become: true
+  gather_facts: true
   tasks:
-    - name: Confirm user provisioning stage
-      ansible.builtin.debug:
-        msg: "No user provisioning tasks configured for {{ inventory_hostname }}"
+    - name: Install PLC periodic change script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/plc-periodic-file-change.sh
+        owner: root
+        group: root
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+
+          target_file="/tmp/plc-periodic-change.txt"
+          log_file="/var/log/plc-periodic-file-change.log"
+
+          if [ -f "$target_file" ]; then
+            rm -f "$target_file"
+            echo "$(date -Is) deleted $target_file" >> "$log_file"
+          else
+            echo "PLC periodic marker created at $(date -Is)" > "$target_file"
+            echo "$(date -Is) created $target_file" >> "$log_file"
+          fi
+
+    - name: Install PLC periodic change service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/plc-periodic-file-change.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=PLC periodic file creation and deletion
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/plc-periodic-file-change.sh
+
+    - name: Install PLC periodic change timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/plc-periodic-file-change.timer
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Run PLC periodic file creation and deletion every minute
+
+          [Timer]
+          OnBootSec=30s
+          OnUnitActiveSec=60s
+          Unit=plc-periodic-file-change.service
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Enable PLC periodic change timer
+      ansible.builtin.systemd:
+        name: plc-periodic-file-change.timer
+        enabled: true
+        state: started
+        daemon_reload: true
