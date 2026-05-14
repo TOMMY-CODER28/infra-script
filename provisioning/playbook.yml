@@ -1,0 +1,8 @@
+---
+- name: User provisioning
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Confirm user provisioning stage
+      ansible.builtin.debug:
+        msg: "No user provisioning tasks configured for {{ inventory_hostname }}"
