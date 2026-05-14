@@ -4,8 +4,8 @@ hosts:
   - name: kali-attacker
     flavor: standard.small
     base_box:
-      image: kali
-      mgmt_user: kali
+      image: ubuntu-noble-x86_64
+      mgmt_user: ubuntu
 
   - name: plc-001
     flavor: standard.small
@@ -18,7 +18,7 @@ routers:
     flavor: standard.small
     base_box:
       image: debian-12-x86_64
-      mgmt_user: user
+      mgmt_user: debian
 
 networks:
   - name: field-zone
