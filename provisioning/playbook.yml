@@ -1,12 +1,19 @@
 ---
-- name: User provisioning
-  hosts: plc-001
+- name: Prepare defender detection
+  hosts: defender
   become: true
   gather_facts: true
   tasks:
-    - name: Install PLC periodic change script
+    - name: Install defender detection tools
+      ansible.builtin.apt:
+        name:
+          - tcpdump
+        state: present
+        update_cache: true
+
+    - name: Install defender nmap detection script
       ansible.builtin.copy:
-        dest: /usr/local/bin/plc-periodic-file-change.sh
+        dest: /usr/local/bin/defender-detect-nmap.sh
         owner: root
         group: root
         mode: "0755"
@@ -14,52 +21,105 @@
           #!/bin/bash
           set -euo pipefail
 
-          target_file="/tmp/plc-periodic-change.txt"
-          log_file="/var/log/plc-periodic-file-change.log"
+          log_file="/var/log/defender-nmap-detection.log"
+          touch "$log_file"
+          exec /usr/bin/tcpdump -i any -l -nn 'tcp[tcpflags] & tcp-syn != 0 and src host 10.10.10.10' 2>/dev/null | while read -r line; do
+            echo "$(date -Is) possible nmap recon from attacker: $line" >> "$log_file"
+          done
 
-          if [ -f "$target_file" ]; then
-            rm -f "$target_file"
-            echo "$(date -Is) deleted $target_file" >> "$log_file"
-          else
-            echo "PLC periodic marker created at $(date -Is)" > "$target_file"
-            echo "$(date -Is) created $target_file" >> "$log_file"
-          fi
-
-    - name: Install PLC periodic change service
+    - name: Install defender nmap detection service
       ansible.builtin.copy:
-        dest: /etc/systemd/system/plc-periodic-file-change.service
+        dest: /etc/systemd/system/defender-nmap-detection.service
         owner: root
         group: root
         mode: "0644"
         content: |
           [Unit]
-          Description=PLC periodic file creation and deletion
+          Description=Detect periodic nmap recon from attacker
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/defender-detect-nmap.sh
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable defender nmap detection service
+      ansible.builtin.systemd:
+        name: defender-nmap-detection.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Prepare attacker periodic nmap recon
+  hosts: attacker
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install nmap on attacker
+      ansible.builtin.apt:
+        name:
+          - nmap
+        state: present
+        update_cache: true
+
+    - name: Install periodic nmap recon script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/attacker-nmap-recon.sh
+        owner: root
+        group: root
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+
+          log_file="/var/log/attacker-nmap-recon.log"
+          target="10.10.10.20"
+
+          echo "$(date -Is) starting quick nmap recon against $target" >> "$log_file"
+          /usr/bin/nmap -Pn -T4 --max-retries 1 --host-timeout 10s -p 22,80,443 "$target" >> "$log_file" 2>&1 || true
+          echo "$(date -Is) finished quick nmap recon against $target" >> "$log_file"
+
+    - name: Install periodic nmap recon service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/attacker-nmap-recon.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Run quick nmap recon against defender
 
           [Service]
           Type=oneshot
-          ExecStart=/usr/local/bin/plc-periodic-file-change.sh
+          ExecStart=/usr/local/bin/attacker-nmap-recon.sh
 
-    - name: Install PLC periodic change timer
+    - name: Install periodic nmap recon timer
       ansible.builtin.copy:
-        dest: /etc/systemd/system/plc-periodic-file-change.timer
+        dest: /etc/systemd/system/attacker-nmap-recon.timer
         owner: root
         group: root
         mode: "0644"
         content: |
           [Unit]
-          Description=Run PLC periodic file creation and deletion every minute
+          Description=Run quick nmap recon every 15 seconds
 
           [Timer]
-          OnBootSec=30s
-          OnUnitActiveSec=60s
-          Unit=plc-periodic-file-change.service
+          OnBootSec=15s
+          OnUnitActiveSec=15s
+          AccuracySec=1s
+          Unit=attacker-nmap-recon.service
 
           [Install]
           WantedBy=timers.target
 
-    - name: Enable PLC periodic change timer
+    - name: Enable periodic nmap recon timer
       ansible.builtin.systemd:
-        name: plc-periodic-file-change.timer
+        name: attacker-nmap-recon.timer
         enabled: true
         state: started
         daemon_reload: true

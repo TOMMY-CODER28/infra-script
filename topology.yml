@@ -1,13 +1,13 @@
-name: "scenario-1-ot-inventory-basic"
+name: "attacker-defender-nmap-recon"
 
 hosts:
-  - name: kali-attacker
+  - name: attacker
     flavor: standard.small
     base_box:
       image: ubuntu-noble-x86_64
       mgmt_user: ubuntu
 
-  - name: plc-001
+  - name: defender
     flavor: standard.small
     base_box:
       image: ubuntu-noble-x86_64
@@ -25,13 +25,13 @@ networks:
     cidr: 10.10.10.0/24
 
 net_mappings:
-  - host: kali-attacker
+  - host: attacker
     network: field-zone
     ip: 10.10.10.10
 
-  - host: plc-001
+  - host: defender
     network: field-zone
-    ip: 10.10.10.21
+    ip: 10.10.10.20
 
 router_mappings:
   - router: substation-router
